@@ -11,7 +11,7 @@ from evaluate import load
 RIVA_HOST  = '71.178.43.144:6605'
 CSV_FILE = ""
 SAMPLE = 50
-FILE_DIR = 'D:/sp/stt_test/riva_test/chunk-en-2023-5-22/'
+FILE_DIR = ''
 
 positive_boost_words =['mutual', 'fund', 'prudential', 'investment', 'icici', 'scheme', 'sip', 'time', 'right', 'number', 'thank', 'morning', 'afternoon', 'funds', 'speaking', 'website', 'amount', 'market', 'actually', 'may', 'related', 'help', 'read', 'documents', 'need', 'carefully', 'option', 'rupees', 'trying', 'redemption', 'charges', 'risk', 'request', 'day', 'invest', 'completed', 'form', 'speak', 'given', 'please', 'dot', 'term', 'process', 'regarding', 'investments', 'subject', 'check', 'transaction', 'hundred', 'observed', 'date', 'inform', 'send', 'folio', 'login', 'visited', 'account', 'details', 'service', 'october', 'application', 'evening', 'subjected', 'month', 'last', 'years', 'received', 'mail', 'new', 'audible', 'means', 'successfully', 'period', 'problem', 'password', 'redeem', 'register', 'information', 'email', 'app', 'invested', 'valuable', 'holding', 'registered', 'year', 'thirty', 'bank', 'issue', 'mention', 'procedure', 'visit', 'equity', 'user', 'manager', 'online', 'banking', 'point', 'contact', 'kumar', 'complete']
 positive_lm_score = 100.0
@@ -53,7 +53,7 @@ def run_inference(audio_file, server=RIVA_HOST, print_full_response=False):
 
 def calculate_wer():
     df_first = pd.read_csv('D:/sp/stt_test/riva_test/ChunkedCallsData-en-2023-05-22.csv')
-    df_first['format_in_wav'] = df_first['filename'].str.replace('mp3', 'wav')
+    #df_first['format_in_wav'] = df_first['filename'].str.replace('mp3', 'wav')
     df_sample = pd.DataFrame()
     df_sample = df_first.sample(SAMPLE)
     reference_text_list = df_sample['modeified_text'].to_list()
