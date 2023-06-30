@@ -5,13 +5,16 @@ from datetime import datetime
 from datetime import date
 import pandas as pd
 from evaluate import load
-#jiwer is also used as a dependency
+import glob
+from jiwer import wer
 
-
-RIVA_HOST  = '71.178.43.144:6605'
+RIVA_HOST  = '192.168.5.18:50051'
 CSV_FILE = ""
-SAMPLE = 50
-FILE_DIR = ''
+SAMPLE = 10
+AUDIO_FILE_DIR = 'D:/sp/stt_test/riva_test/chunk-en-2023-5-22/'
+REPORTS_DIR = 'D:/sp/stt_test/reports/'
+CLIENT_NAME = 'amc'
+
 
 positive_boost_words =['mutual', 'fund', 'prudential', 'investment', 'icici', 'scheme', 'sip', 'time', 'right', 'number', 'thank', 'morning', 'afternoon', 'funds', 'speaking', 'website', 'amount', 'market', 'actually', 'may', 'related', 'help', 'read', 'documents', 'need', 'carefully', 'option', 'rupees', 'trying', 'redemption', 'charges', 'risk', 'request', 'day', 'invest', 'completed', 'form', 'speak', 'given', 'please', 'dot', 'term', 'process', 'regarding', 'investments', 'subject', 'check', 'transaction', 'hundred', 'observed', 'date', 'inform', 'send', 'folio', 'login', 'visited', 'account', 'details', 'service', 'october', 'application', 'evening', 'subjected', 'month', 'last', 'years', 'received', 'mail', 'new', 'audible', 'means', 'successfully', 'period', 'problem', 'password', 'redeem', 'register', 'information', 'email', 'app', 'invested', 'valuable', 'holding', 'registered', 'year', 'thirty', 'bank', 'issue', 'mention', 'procedure', 'visit', 'equity', 'user', 'manager', 'online', 'banking', 'point', 'contact', 'kumar', 'complete']
 positive_lm_score = 100.0
@@ -53,47 +56,85 @@ def run_inference(audio_file, server=RIVA_HOST, print_full_response=False):
 
 def calculate_wer():
     df_first = pd.read_csv('D:/sp/stt_test/riva_test/ChunkedCallsData-en-2023-05-22.csv')
-    #df_first['format_in_wav'] = df_first['filename'].str.replace('mp3', 'wav')
+    df_first['format_in_wav'] = df_first['filename'].str.replace('mp3', 'wav')
     df_sample = pd.DataFrame()
+    df_inference = pd.DataFrame()
     df_sample = df_first.sample(SAMPLE)
     reference_text_list = df_sample['modeified_text'].to_list()
     predicted_text_list = []
     for audio in df_sample['format_in_wav']:
-        full_audio = FILE_DIR + audio
+        full_audio = AUDIO_FILE_DIR + audio
         print(full_audio)
-        predicted_text_value = run_inference(full_audio, server=RIVA_HOST, print_full_response=False)
-        predicted_text_list.append(predicted_text_value)
+        try:
+            predicted_text_value = run_inference(full_audio, server=RIVA_HOST, print_full_response=False)
+            predicted_text_list.append(predicted_text_value)
+        except(IndexError):
+            predicted_text_list.append("Not detected")
+            print(f"error at {full_audio}")
     
+    df_inference['filename'] = df_sample['filename']
+    df_inference['reference_text'] = reference_text_list
+    df_inference['predicted_text'] = predicted_text_list
+    df_inference['wer'] = df_inference.apply(lambda row: wer(row['reference_text'], row['predicted_text']), axis = 1)
+
     print("reference text length = ", len(reference_text_list), "predicted text length = ", len(predicted_text_list))
-    wer = load("wer")
-    wer_score = wer.compute(references=reference_text_list, predictions=predicted_text_list)
+    wer_1 = load("wer")
+    wer_score = wer_1.compute(references=reference_text_list, predictions=predicted_text_list)
     print("wer score = ", wer_score)
-    return wer_score
+    return wer_score, df_inference
 
 
 def main():
     #df = pd.read_csv(CSV_FILE)
-    wer_value = calculate_wer()
+    wer_value, df_inference = calculate_wer()
     report_dict = {
-        'wer' : wer_value,
-        'sample' : SAMPLE,
-        'client_project' : 'amc_english_audio'
+        'wer':wer_value,
+        'sample':SAMPLE,
+        'client_project':'amc_english_audio'
     }
+    print("report dictionary = ", report_dict)
+    report_df = pd.DataFrame(report_dict, index = [0])
 
-    report_df = pd.DataFrame(list(report_dict))
+    date_folder_name = date.today().strftime("%Y-%m-%d")
+    client_directory_path = os.path.join(REPORTS_DIR, CLIENT_NAME)
+    os.makedirs(client_directory_path, exist_ok=True)
+    date_folder = os.path.join(client_directory_path, date_folder_name)
+    os.makedirs(date_folder, exist_ok=True)
+    date_directory_path = os.path.join(client_directory_path, date_folder)
+    print("date directory = ", date_directory_path)
 
-    current_date = date.today()
-    folder_name = current_date.strftime("%Y-%m-%d")
-    folder_path = 'D:/sp/stt_test/reports/'
-    os.makedirs(os.path.join(folder_path, folder_name), exist_ok=True)
+
+    # Get a list of files in the directory
+    files = glob.glob(os.path.join(date_directory_path, '*'))
+
+    files.sort(key=os.path.getmtime, reverse=True)
+
+    # Check if any files exist in the directory
+    if files:
+        last_file_name = os.path.basename(files[0])
+        print(f"The last file in the directory is: {last_file_name}")
+        last_file_iteration = last_file_name.split('_')[-1]
+        last_file_iteration_no = int(last_file_iteration)
+        last_file_iteration_no = last_file_iteration_no +1
+        last_file_iteration_no = str(last_file_iteration_no)
+        client_file_name = CLIENT_NAME + "_" + last_file_iteration_no
+        client_file_path = os.path.join(date_directory_path, client_file_name)
+        os.makedirs(client_file_path, exist_ok=True)
+    else:
+        client_file_name = f"{CLIENT_NAME}_1"
+        client_file_path = os.path.join(date_directory_path, client_file_name)
+        os.makedirs(client_file_path, exist_ok=True)
+
 
     current_datetime = datetime.now()
     datetime_string = current_datetime.strftime("%Y-%m-%d_%H-%M-%S")
 
-    file_name = f"report_{datetime_string}.csv"
-    file_path = os.path.join(folder_path + "/" + folder_name, file_name)
-    report_df.to_csv(file_path)
-
+    report_file_name = f"report_{datetime_string}.csv"
+    inference_file_name = f"inference_{datetime_string}.csv"
+    report_file_path = os.path.join(client_file_path, report_file_name)
+    inference_file_path = os.path.join(client_file_path, inference_file_name)
+    report_df.to_csv(report_file_path)
+    df_inference.to_csv(inference_file_path)
 
 if __name__ == "__main__":
     main()
